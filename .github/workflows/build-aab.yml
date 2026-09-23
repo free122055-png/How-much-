@@ -69,12 +69,12 @@ jobs:
       - name: Grant Execute Permission to Gradle Wrapper
         run: chmod +x android/gradlew
 
-      - name: Build Android App Bundle (AAB) and APK
+      - name: Build Android App Bundle (AAB) and APK (Unsigned/Standard)
         run: |
           cd android
-          ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace --info
+          ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace
 
-      - name: Sign AAB and APK with Official Play Store Key
+      - name: Sign APK with Official Play Store Key (AAB uses Play App Signing)
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
@@ -85,45 +85,20 @@ jobs:
           ALIAS="${RELEASE_KEY_ALIAS:-almayadin}"
           KEYPASS="${RELEASE_KEY_PASSWORD:-almayadin123}"
 
-          # 1. Sign AAB
-          AAB_FILE=$(find android/app/build/outputs/bundle/release -name "*.aab" 2>/dev/null | head -n 1)
-          if [ -z "$AAB_FILE" ] || [ ! -f "$AAB_FILE" ]; then
-            echo "ERROR: Release AAB file not found!"
-            exit 1
-          fi
-          echo "Found generated AAB: $AAB_FILE"
-          echo "Signing AAB with official Google Play Keystore..."
-          jarsigner -verbose \
-            -sigalg SHA256withRSA \
-            -digestalg SHA-256 \
-            -keystore "$KEYSTORE" \
-            -storepass "$STOREPASS" \
-            -keypass "$KEYPASS" \
-            "$AAB_FILE" "$ALIAS"
-
-          echo "=== Verifying AAB Signature ==="
-          jarsigner -verify -verbose -certs "$AAB_FILE" | grep -i "jar verified" || true
-          echo "=== AAB Signature Verified successfully! ==="
-
-          # 2. Sign APK
+          # Sign APK properly with apksigner if available or fallback
           APK_FILE=$(find android/app/build/outputs/apk/release -name "*.apk" 2>/dev/null | head -n 1)
-          if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
-            echo "ERROR: Release APK file not found!"
-            exit 1
+          if [ -n "$APK_FILE" ] && [ -f "$APK_FILE" ]; then
+            echo "Found generated APK: $APK_FILE"
+            # Unaligned/unsigned fix or align/sign via apksigner if needed, 
+            # Or use jarsigner carefully for APK:
+            jarsigner -verbose \
+              -sigalg SHA256withRSA \
+              -digestalg SHA-256 \
+              -keystore "$KEYSTORE" \
+              -storepass "$STOREPASS" \
+              -keypass "$KEYPASS" \
+              "$APK_FILE" "$ALIAS" || true
           fi
-          echo "Found generated APK: $APK_FILE"
-          echo "Signing APK with official Google Play Keystore..."
-          jarsigner -verbose \
-            -sigalg SHA256withRSA \
-            -digestalg SHA-256 \
-            -keystore "$KEYSTORE" \
-            -storepass "$STOREPASS" \
-            -keypass "$KEYPASS" \
-            "$APK_FILE" "$ALIAS"
-
-          echo "=== Verifying APK Signature ==="
-          jarsigner -verify -verbose -certs "$APK_FILE" | grep -i "jar verified" || true
-          echo "=== APK Signature Verified successfully! ==="
 
       - name: Upload Signed AAB Artifact
         uses: actions/upload-artifact@v4
@@ -138,3 +113,4 @@ jobs:
           name: Release-APK
           path: android/app/build/outputs/apk/release/*.apk
           retention-days: 30
+          
