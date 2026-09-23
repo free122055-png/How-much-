@@ -99,7 +99,11 @@ jobs:
       - name: Build Android App Bundle (AAB) and APK
         run: |
           cd android
-          ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace
+          ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace --info || {
+            echo "=== GRADLE BUILD FAILED ==="
+            find . -name "*.log" -exec cat {} + || true
+            exit 1
+          }
 
       - name: Sign AAB and APK with Official Play Store Key
         env:
