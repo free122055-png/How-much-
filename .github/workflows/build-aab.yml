@@ -69,6 +69,30 @@ jobs:
       - name: Grant Execute Permission to Gradle Wrapper
         run: chmod +x android/gradlew
 
+      - name: Patch Android Build Configs for AGP 8+ Compatibility
+        run: |
+          cd android
+          if ! grep -q "android.enableJetifier=true" gradle.properties; then
+            echo "android.enableJetifier=true" >> gradle.properties
+          fi
+          python3 -c "
+          path = 'build.gradle'
+          with open(path, 'r') as f:
+              content = f.read()
+          target = '''        if (project.hasProperty(\"android\")) {
+            project.android {'''
+          replacement = '''        if (project.hasProperty(\"android\")) {
+            project.android {
+                if (namespace == null) {
+                    namespace = project.group != '' ? project.group : \"com.capacitor.plugin.\" + project.name.replaceAll('-', '_')
+                }'''
+          if 'if (namespace == null)' not in content and target in content:
+              content = content.replace(target, replacement, 1)
+              with open(path, 'w') as f:
+                  f.write(content)
+              print('Successfully patched build.gradle namespace injection!')
+          "
+
       - name: Build Android App Bundle (AAB) and APK
         run: |
           cd android
