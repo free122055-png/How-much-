@@ -1,11 +1,11 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.bnb.business.network"
+    namespace = "com.dailyinternetoffer.bd"
     compileSdk = rootProject.ext.compileSdkVersion
 
     defaultConfig {
-        applicationId "com.bnb.business.network"
+        applicationId "com.dailyinternetoffer.bd"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 28

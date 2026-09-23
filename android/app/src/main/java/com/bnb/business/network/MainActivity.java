@@ -1,4 +1,4 @@
-package com.bnb.app;
+package com.bnb.business.network;
 
 import com.getcapacitor.BridgeActivity;
 
