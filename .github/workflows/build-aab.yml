@@ -57,6 +57,15 @@ jobs:
           "
           ls -la android/app/release.keystore
 
+      - name: Fix Corrupted App Icons
+        run: |
+          echo "=== Fixing potentially corrupt launcher icons ==="
+          sudo apt-get update && sudo apt-get install -y imagemagick
+          find android/app/src/main/res -name "ic_launcher*.png" | while read -r img; do
+            echo "Sanitizing PNG: $img"
+            convert "$img" -strip PNG32:"$img" || rm -f "$img"
+          done
+
       - name: Ensure Gradle Wrapper and Permissions
         run: |
           cd android
@@ -69,12 +78,12 @@ jobs:
       - name: Grant Execute Permission to Gradle Wrapper
         run: chmod +x android/gradlew
 
-      - name: Build Android App Bundle (AAB) and APK (Unsigned/Standard)
+      - name: Build Android App Bundle (AAB) and APK
         run: |
           cd android
           ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace
 
-      - name: Sign APK with Official Play Store Key (AAB uses Play App Signing)
+      - name: Sign APK with Official Play Store Key
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
@@ -85,12 +94,9 @@ jobs:
           ALIAS="${RELEASE_KEY_ALIAS:-almayadin}"
           KEYPASS="${RELEASE_KEY_PASSWORD:-almayadin123}"
 
-          # Sign APK properly with apksigner if available or fallback
           APK_FILE=$(find android/app/build/outputs/apk/release -name "*.apk" 2>/dev/null | head -n 1)
           if [ -n "$APK_FILE" ] && [ -f "$APK_FILE" ]; then
-            echo "Found generated APK: $APK_FILE"
-            # Unaligned/unsigned fix or align/sign via apksigner if needed, 
-            # Or use jarsigner carefully for APK:
+            echo "Signing APK: $APK_FILE"
             jarsigner -verbose \
               -sigalg SHA256withRSA \
               -digestalg SHA-256 \
