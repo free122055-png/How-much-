@@ -34,23 +34,23 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android
 
-      - name: Fix and Regenerate Clean Launcher Icons
+      - name: Fix Duplicate & Corrupted Icons
         run: |
-          echo "=== Fixing and replacing corrupted launcher icons ==="
+          echo "=== Fixing duplicate & invalid launcher icons ==="
           sudo apt-get update && sudo apt-get install -y imagemagick
-          
-          # Remove broken launcher assets generated or synced into android res
-          find android/app/src/main/res -name "ic_launcher*.png" -delete || true
-          
-          # Generate 100% valid, standard PNG icons in all mipmap directories
-          for dir in android/app/src/main/res/mipmap-*; do
-            if [ -d "$dir" ]; then
-              convert -size 192x192 xc:"#3880ff" -fill white -draw "circle 96,96 96,20" "$dir/ic_launcher.png"
-              convert -size 192x192 xc:"#3880ff" -fill white -draw "circle 96,96 96,20" "$dir/ic_launcher_round.png"
-              convert -size 192x192 xc:transparent -fill white -draw "circle 96,96 96,20" "$dir/ic_launcher_foreground.png"
-            fi
+
+          # 1. Remove duplicate png files inside anydpi-v26 (which causes Duplicate resources error)
+          rm -rf android/app/src/main/res/mipmap-anydpi-v26/*.png
+
+          # 2. Fix valid launcher icons inside standard density directories only
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            dir="android/app/src/main/res/mipmap-$density"
+            mkdir -p "$dir"
+            convert -size 192x192 xc:"#3880ff" -fill white -draw "circle 96,96 96,20" "$dir/ic_launcher.png"
+            convert -size 192x192 xc:"#3880ff" -fill white -draw "circle 96,96 96,20" "$dir/ic_launcher_round.png"
+            convert -size 192x192 xc:transparent -fill white -draw "circle 96,96 96,20" "$dir/ic_launcher_foreground.png"
           done
-          echo "Launcher icons replaced successfully with valid PNGs!"
+          echo "Icons sanitized successfully without duplicates!"
 
       - name: Inject Official Play Store Keystore
         env:
