@@ -75,6 +75,9 @@ jobs:
           if ! grep -q "android.enableJetifier=true" gradle.properties; then
             echo "android.enableJetifier=true" >> gradle.properties
           fi
+          if ! grep -q "android.suppressUnsupportedCompileSdk" gradle.properties; then
+            echo "android.suppressUnsupportedCompileSdk=36" >> gradle.properties
+          fi
           python3 -c "
           path = 'build.gradle'
           with open(path, 'r') as f:
