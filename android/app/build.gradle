@@ -23,10 +23,12 @@ android {
 
     signingConfigs {
         release {
-            storeFile file('release.keystore')
-            storePassword 'almayadin123'
-            keyAlias 'almayadin'
-            keyPassword 'almayadin123'
+            if (file('release.keystore').exists()) {
+                storeFile file('release.keystore')
+                storePassword 'almayadin123'
+                keyAlias 'almayadin'
+                keyPassword 'almayadin123'
+            }
         }
     }
 
@@ -34,6 +36,9 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (file('release.keystore').exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
