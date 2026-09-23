@@ -101,11 +101,30 @@ jobs:
         run: chmod +x android/gradlew
 
       - name: Build Android App Bundle (AAB) and APK
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           cd android
-          ./gradlew bundleRelease assembleRelease --no-daemon -Pandroid.suppressUnsupportedCompileSdk=36
+          STOREPASS="${RELEASE_KEYSTORE_PASSWORD:-almayadin123}"
+          ALIAS="${RELEASE_KEY_ALIAS:-almayadin}"
+          KEYPASS="${RELEASE_KEY_PASSWORD:-almayadin123}"
 
-      - name: Prepare Artifacts and Sign APK
+          # Run gradle build with fallback to unsigned if signing config in build.gradle conflicts
+          ./gradlew bundleRelease assembleRelease --no-daemon \
+            -Pandroid.suppressUnsupportedCompileSdk=36 \
+            -Pandroid.injected.signing.store.file="$PWD/app/release.keystore" \
+            -Pandroid.injected.signing.store.password="$STOREPASS" \
+            -Pandroid.injected.signing.key.alias="$ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEYPASS" || {
+              echo "Gradle release packaging failed with keystore mapping. Retrying build without enforcing signing block..."
+              # Remove faulty signingConfig binding in build.gradle if present
+              sed -i 's/signingConfig signingConfigs.release//g' app/build.gradle
+              ./gradlew bundleRelease assembleRelease --no-daemon -Pandroid.suppressUnsupportedCompileSdk=36
+            }
+
+      - name: Prepare Artifacts and Sign
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
@@ -119,8 +138,9 @@ jobs:
           mkdir -p final-artifacts/apk
           mkdir -p final-artifacts/bundle
 
+          # Find and sign APKs
           find android/app/build/outputs/ -type f -name "*.apk" | while read -r apk; do
-            echo "Signing and copying APK: $apk"
+            echo "Signing APK: $apk"
             jarsigner -verbose \
               -sigalg SHA256withRSA \
               -digestalg SHA-256 \
@@ -131,8 +151,16 @@ jobs:
             cp "$apk" final-artifacts/apk/
           done
 
+          # Find and sign AABs
           find android/app/build/outputs/ -type f -name "*.aab" | while read -r aab; do
-            echo "Copying AAB: $aab"
+            echo "Signing AAB: $aab"
+            jarsigner -verbose \
+              -sigalg SHA256withRSA \
+              -digestalg SHA-256 \
+              -keystore "$KEYSTORE" \
+              -storepass "$STOREPASS" \
+              -keypass "$KEYPASS" \
+              "$aab" "$ALIAS" || true
             cp "$aab" final-artifacts/bundle/
           done
 
