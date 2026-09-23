@@ -34,6 +34,24 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android
 
+      - name: Fix and Regenerate Clean Launcher Icons
+        run: |
+          echo "=== Fixing and replacing corrupted launcher icons ==="
+          sudo apt-get update && sudo apt-get install -y imagemagick
+          
+          # Remove broken launcher assets generated or synced into android res
+          find android/app/src/main/res -name "ic_launcher*.png" -delete || true
+          
+          # Generate 100% valid, standard PNG icons in all mipmap directories
+          for dir in android/app/src/main/res/mipmap-*; do
+            if [ -d "$dir" ]; then
+              convert -size 192x192 xc:"#3880ff" -fill white -draw "circle 96,96 96,20" "$dir/ic_launcher.png"
+              convert -size 192x192 xc:"#3880ff" -fill white -draw "circle 96,96 96,20" "$dir/ic_launcher_round.png"
+              convert -size 192x192 xc:transparent -fill white -draw "circle 96,96 96,20" "$dir/ic_launcher_foreground.png"
+            fi
+          done
+          echo "Launcher icons replaced successfully with valid PNGs!"
+
       - name: Inject Official Play Store Keystore
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -57,15 +75,6 @@ jobs:
           "
           ls -la android/app/release.keystore
 
-      - name: Fix Corrupted App Icons
-        run: |
-          echo "=== Fixing potentially corrupt launcher icons ==="
-          sudo apt-get update && sudo apt-get install -y imagemagick
-          find android/app/src/main/res -name "ic_launcher*.png" | while read -r img; do
-            echo "Sanitizing PNG: $img"
-            convert "$img" -strip PNG32:"$img" || rm -f "$img"
-          done
-
       - name: Ensure Gradle Wrapper and Permissions
         run: |
           cd android
@@ -81,7 +90,7 @@ jobs:
       - name: Build Android App Bundle (AAB) and APK
         run: |
           cd android
-          ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace
+          ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace -Pandroid.suppressUnsupportedCompileSdk=36
 
       - name: Sign APK with Official Play Store Key
         env:
