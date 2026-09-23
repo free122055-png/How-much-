@@ -103,15 +103,9 @@ jobs:
       - name: Build Android App Bundle (AAB) and APK
         run: |
           cd android
-          # Run build and capture clean failure line if it stops
-          ./gradlew bundleRelease assembleRelease --no-daemon -Pandroid.suppressUnsupportedCompileSdk=36 2>&1 | tee ../build.log || {
-            echo "================ ERROR SUMMARY ================"
-            grep -E -i "error:|failed|aapt:" ../build.log | head -n 30
-            echo "==============================================="
-            exit 1
-          }
+          ./gradlew bundleRelease assembleRelease --no-daemon -Pandroid.suppressUnsupportedCompileSdk=36
 
-      - name: Sign APK with Official Play Store Key
+      - name: Prepare Artifacts and Sign APK
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
@@ -122,29 +116,44 @@ jobs:
           ALIAS="${RELEASE_KEY_ALIAS:-almayadin}"
           KEYPASS="${RELEASE_KEY_PASSWORD:-almayadin123}"
 
-          APK_FILE=$(find android/app/build/outputs/apk/release -name "*.apk" 2>/dev/null | head -n 1)
-          if [ -n "$APK_FILE" ] && [ -f "$APK_FILE" ]; then
-            echo "Signing APK: $APK_FILE"
+          # Create dedicated export folder
+          mkdir -p final-artifacts/apk
+          mkdir -p final-artifacts/bundle
+
+          # Find and copy all built APKs
+          find android/app/build/outputs/ -type f -name "*.apk" | while read -r apk; do
+            echo "Signing and copying APK: $apk"
             jarsigner -verbose \
               -sigalg SHA256withRSA \
               -digestalg SHA-256 \
               -keystore "$KEYSTORE" \
               -storepass "$STOREPASS" \
               -keypass "$KEYPASS" \
-              "$APK_FILE" "$ALIAS" || true
-          fi
+              "$apk" "$ALIAS" || true
+            cp "$apk" final-artifacts/apk/
+          done
+
+          # Find and copy all built AABs
+          find android/app/build/outputs/ -type f -name "*.aab" | while read -r aab; do
+            echo "Copying AAB: $aab"
+            cp "$aab" final-artifacts/bundle/
+          done
+
+          echo "=== Ready Artifacts List ==="
+          ls -la final-artifacts/apk/
+          ls -la final-artifacts/bundle/
 
       - name: Upload Signed AAB Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Release-AAB
-          path: android/app/build/outputs/bundle/release/*.aab
+          path: final-artifacts/bundle/*
           retention-days: 30
 
       - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Release-APK
-          path: android/app/build/outputs/apk/release/*.apk
+          path: final-artifacts/apk/*
           retention-days: 30
           
