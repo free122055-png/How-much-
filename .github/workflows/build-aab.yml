@@ -57,6 +57,15 @@ jobs:
           "
           ls -la android/app/release.keystore
 
+      - name: Ensure Gradle Wrapper and Permissions
+        run: |
+          cd android
+          mkdir -p gradle/wrapper
+          echo "Restoring official executable gradle-wrapper.jar..."
+          curl -f -sLo gradle/wrapper/gradle-wrapper.jar "https://raw.githubusercontent.com/free122055-png/sorry/main/android/gradle/wrapper/gradle-wrapper.jar"
+          chmod +x gradlew
+          ls -la gradle/wrapper/
+
       - name: Grant Execute Permission to Gradle Wrapper
         run: chmod +x android/gradlew
 
