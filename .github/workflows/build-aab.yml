@@ -75,13 +75,15 @@ jobs:
           if ! grep -q "android.enableJetifier=true" gradle.properties; then
             echo "android.enableJetifier=true" >> gradle.properties
           fi
-          if ! grep -q "android.suppressUnsupportedCompileSdk" gradle.properties; then
-            echo "android.suppressUnsupportedCompileSdk=36" >> gradle.properties
+          if [ -f "variables.gradle" ]; then
+            sed -i 's/compileSdkVersion = 36/compileSdkVersion = 35/g' variables.gradle
+            sed -i 's/targetSdkVersion = 36/targetSdkVersion = 35/g' variables.gradle
           fi
           python3 -c "
           path = 'build.gradle'
           with open(path, 'r') as f:
               content = f.read()
+          content = content.replace('compileSdkVersion 36', 'compileSdkVersion 35')
           target = '''        if (project.hasProperty(\"android\")) {
             project.android {'''
           replacement = '''        if (project.hasProperty(\"android\")) {
@@ -91,9 +93,9 @@ jobs:
                 }'''
           if 'if (namespace == null)' not in content and target in content:
               content = content.replace(target, replacement, 1)
-              with open(path, 'w') as f:
-                  f.write(content)
-              print('Successfully patched build.gradle namespace injection!')
+          with open(path, 'w') as f:
+              f.write(content)
+          print('Successfully patched build.gradle and variables.gradle!')
           "
 
       - name: Build Android App Bundle (AAB) and APK
