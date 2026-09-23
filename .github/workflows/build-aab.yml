@@ -19,11 +19,11 @@ jobs:
         with:
           node-version: 22
 
-      - name: Setup Java JDK 17
+      - name: Setup Java JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Install Node Dependencies
         run: npm install --legacy-peer-deps
@@ -116,11 +116,9 @@ jobs:
           ALIAS="${RELEASE_KEY_ALIAS:-almayadin}"
           KEYPASS="${RELEASE_KEY_PASSWORD:-almayadin123}"
 
-          # Create dedicated export folder
           mkdir -p final-artifacts/apk
           mkdir -p final-artifacts/bundle
 
-          # Find and copy all built APKs
           find android/app/build/outputs/ -type f -name "*.apk" | while read -r apk; do
             echo "Signing and copying APK: $apk"
             jarsigner -verbose \
@@ -133,7 +131,6 @@ jobs:
             cp "$apk" final-artifacts/apk/
           done
 
-          # Find and copy all built AABs
           find android/app/build/outputs/ -type f -name "*.aab" | while read -r aab; do
             echo "Copying AAB: $aab"
             cp "$aab" final-artifacts/bundle/
