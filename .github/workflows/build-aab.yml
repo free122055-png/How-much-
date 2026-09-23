@@ -34,15 +34,15 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android
 
-      - name: Fix Duplicate & Corrupted Icons
+      - name: Sanitize All Android Images and Splash
         run: |
-          echo "=== Fixing duplicate & invalid launcher icons ==="
+          echo "=== Fixing corrupted splash and duplicate icons ==="
           sudo apt-get update && sudo apt-get install -y imagemagick
 
-          # 1. Remove duplicate png files inside anydpi-v26 (which causes Duplicate resources error)
+          # 1. Remove duplicate png inside mipmap-anydpi-v26
           rm -rf android/app/src/main/res/mipmap-anydpi-v26/*.png
 
-          # 2. Fix valid launcher icons inside standard density directories only
+          # 2. Fix valid launcher icons
           for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             dir="android/app/src/main/res/mipmap-$density"
             mkdir -p "$dir"
@@ -50,7 +50,19 @@ jobs:
             convert -size 192x192 xc:"#3880ff" -fill white -draw "circle 96,96 96,20" "$dir/ic_launcher_round.png"
             convert -size 192x192 xc:transparent -fill white -draw "circle 96,96 96,20" "$dir/ic_launcher_foreground.png"
           done
-          echo "Icons sanitized successfully without duplicates!"
+
+          # 3. Fix corrupted splash images across all drawable folders
+          find android/app/src/main/res -type d -name "drawable*" | while read -r d; do
+            if [ -f "$d/splash.png" ]; then
+              echo "Fixing corrupt splash in $d"
+              convert -size 480x800 xc:"#1a1b1f" PNG32:"$d/splash.png"
+            fi
+          done
+
+          # Ensure default drawable/splash.png exists and is valid
+          mkdir -p android/app/src/main/res/drawable
+          convert -size 480x800 xc:"#1a1b1f" PNG32:"android/app/src/main/res/drawable/splash.png"
+          echo "All images sanitized successfully!"
 
       - name: Inject Official Play Store Keystore
         env:
