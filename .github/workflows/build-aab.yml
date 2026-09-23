@@ -34,35 +34,36 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android
 
-      - name: Sanitize All Android Images and Splash
+      - name: Complete Resource Sanitize
         run: |
-          echo "=== Fixing corrupted splash and duplicate icons ==="
+          echo "=== Sanitizing and generating 100% valid Android images ==="
           sudo apt-get update && sudo apt-get install -y imagemagick
 
-          # 1. Remove duplicate png inside mipmap-anydpi-v26
+          # 1. Remove XML/PNG conflicts inside mipmap-anydpi-v26
           rm -rf android/app/src/main/res/mipmap-anydpi-v26/*.png
 
-          # 2. Fix valid launcher icons
+          # 2. Re-create valid icons for all mipmap buckets
           for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             dir="android/app/src/main/res/mipmap-$density"
             mkdir -p "$dir"
-            convert -size 192x192 xc:"#3880ff" -fill white -draw "circle 96,96 96,20" "$dir/ic_launcher.png"
-            convert -size 192x192 xc:"#3880ff" -fill white -draw "circle 96,96 96,20" "$dir/ic_launcher_round.png"
-            convert -size 192x192 xc:transparent -fill white -draw "circle 96,96 96,20" "$dir/ic_launcher_foreground.png"
+            convert -size 192x192 xc:"#3880ff" -fill white -draw "circle 96,96 96,20" PNG32:"$dir/ic_launcher.png"
+            convert -size 192x192 xc:"#3880ff" -fill white -draw "circle 96,96 96,20" PNG32:"$dir/ic_launcher_round.png"
+            convert -size 192x192 xc:transparent -fill white -draw "circle 96,96 96,20" PNG32:"$dir/ic_launcher_foreground.png"
           done
 
-          # 3. Fix corrupted splash images across all drawable folders
-          find android/app/src/main/res -type d -name "drawable*" | while read -r d; do
-            if [ -f "$d/splash.png" ]; then
-              echo "Fixing corrupt splash in $d"
-              convert -size 480x800 xc:"#1a1b1f" PNG32:"$d/splash.png"
+          # 3. Replace all splash images across all drawable folders with clean PNGs
+          find android/app/src/main/res -name "*splash*.png" | while read -r splash_file; do
+            echo "Replacing splash file: $splash_file"
+            convert -size 480x800 xc:"#1a1b1f" PNG32:"$splash_file"
+          done
+
+          # 4. Verify all remaining png files; if corrupt, replace with standard valid PNG
+          find android/app/src/main/res -name "*.png" | while read -r img; do
+            if ! identify "$img" >/dev/null 2>&1; then
+              echo "Fixing corrupted image: $img"
+              convert -size 96x96 xc:"#3880ff" PNG32:"$img"
             fi
           done
-
-          # Ensure default drawable/splash.png exists and is valid
-          mkdir -p android/app/src/main/res/drawable
-          convert -size 480x800 xc:"#1a1b1f" PNG32:"android/app/src/main/res/drawable/splash.png"
-          echo "All images sanitized successfully!"
 
       - name: Inject Official Play Store Keystore
         env:
