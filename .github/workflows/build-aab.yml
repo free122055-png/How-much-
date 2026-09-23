@@ -89,30 +89,50 @@ jobs:
       - name: Grant Execute Permission to Gradle Wrapper
         run: chmod +x android/gradlew
 
-      - name: Build Android App Bundle (AAB) and APK
+      - name: Build Android Unsigned AAB and APK
+        run: |
+          cd android
+          ./gradlew bundleRelease assembleRelease --no-daemon
+
+      - name: Manual Sign Artifacts with Jarsigner
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          cd android
+          KEYSTORE="android/app/release.keystore"
           STOREPASS="${RELEASE_KEYSTORE_PASSWORD:-almayadin123}"
           ALIAS="${RELEASE_KEY_ALIAS:-almayadin}"
           KEYPASS="${RELEASE_KEY_PASSWORD:-almayadin123}"
 
-          # Build and Sign natively using Gradle
-          ./gradlew bundleRelease assembleRelease --no-daemon \
-            -Pandroid.injected.signing.store.file="$PWD/app/release.keystore" \
-            -Pandroid.injected.signing.store.password="$STOREPASS" \
-            -Pandroid.injected.signing.key.alias="$ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEYPASS"
-
-      - name: Prepare Final Artifacts
-        run: |
           mkdir -p final-artifacts/apk
           mkdir -p final-artifacts/bundle
-          cp android/app/build/outputs/bundle/release/*.aab final-artifacts/bundle/
-          cp android/app/build/outputs/apk/release/*.apk final-artifacts/apk/
+
+          # Find and sign APKs
+          find android/app/build/outputs/apk/release -name "*.apk" | while read -r apk; do
+            echo "Signing APK: $apk"
+            jarsigner -verbose \
+              -sigalg SHA256withRSA \
+              -digestalg SHA-256 \
+              -keystore "$KEYSTORE" \
+              -storepass "$STOREPASS" \
+              -keypass "$KEYPASS" \
+              "$apk" "$ALIAS"
+            cp "$apk" final-artifacts/apk/
+          done
+
+          # Find and sign AABs
+          find android/app/build/outputs/bundle/release -name "*.aab" | while read -r aab; do
+            echo "Signing AAB: $aab"
+            jarsigner -verbose \
+              -sigalg SHA256withRSA \
+              -digestalg SHA-256 \
+              -keystore "$KEYSTORE" \
+              -storepass "$STOREPASS" \
+              -keypass "$KEYPASS" \
+              "$aab" "$ALIAS"
+            cp "$aab" final-artifacts/bundle/
+          done
 
       - name: Upload Signed AAB Artifact
         uses: actions/upload-artifact@v4
