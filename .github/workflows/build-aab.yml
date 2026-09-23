@@ -69,9 +69,8 @@ jobs:
       - name: Build Android App Bundle (AAB) and APK
         run: |
           cd android
-          ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace || {
+          ./gradlew bundleRelease assembleRelease --no-daemon --info --stacktrace || {
             echo "=== GRADLE BUILD FAILED ==="
-            find app/build -name "*.log" -print -exec cat {} \; || true
             exit 1
           }
 
