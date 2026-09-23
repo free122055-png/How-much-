@@ -23,22 +23,18 @@ android {
 
     signingConfigs {
         release {
-            if (file('release.keystore').exists()) {
-                storeFile file('release.keystore')
-                storePassword 'almayadin123'
-                keyAlias 'almayadin'
-                keyPassword 'almayadin123'
-            }
+            storeFile file('release.keystore')
+            storePassword 'almayadin123'
+            keyAlias 'almayadin'
+            keyPassword 'almayadin123'
         }
     }
 
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            if (file('release.keystore').exists()) {
-                signingConfig signingConfigs.release
-            }
         }
     }
 
